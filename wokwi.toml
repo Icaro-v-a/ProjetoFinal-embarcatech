@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "build/tarefa-1-pico-gpio.uf2"
+elf = "build/tarefa-1-pico-gpio.elf"
