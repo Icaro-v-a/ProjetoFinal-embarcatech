@@ -51,6 +51,9 @@ pico_sdk_init()
 
 add_executable(tarefa-1-pico-gpio tarefa-1-pico-gpio.c inc/ssd1306.c)
 
+# Then generate PIO header
+pico_generate_pio_header(tarefa-1-pico-gpio ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
+
 pico_set_program_name(tarefa-1-pico-gpio "tarefa-1-pico-gpio")
 pico_set_program_version(tarefa-1-pico-gpio "0.1")
 
