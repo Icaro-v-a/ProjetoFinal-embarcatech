@@ -33,10 +33,10 @@
 #define FILTER_SIZE 5        // Tamanho do filtro de média móvel
 
 // Definições para simulação de sensores
-#define TEMP_MIN 10  // Temperatura mínima (simulada)
-#define TEMP_MAX 40  // Temperatura máxima (simulada)
-#define HUMID_MIN 20 // Umidade mínima (simulada)
-#define HUMID_MAX 80 // Umidade máxima (simulada)
+#define TEMP_MIN 0  // Temperatura mínima (simulada)
+#define TEMP_MAX 50  // Temperatura máxima (simulada)
+#define HUMID_MIN 10 // Umidade mínima (simulada)
+#define HUMID_MAX 90 // Umidade máxima (simulada)
 
 // Definições para a matriz de LEDs
 #define MATRIX_ROWS 5  // Número de linhas da matriz de LEDs
@@ -57,7 +57,7 @@ absolute_time_t last_time_sw = 0; // Último tempo de pressionamento do botão S
 ssd1306_t ssd;                    // Estrutura para controlar o display OLED
 bool display_mode = false;        // Modo de exibição (dados/gráficos)
 float temperature = 25.0;         // Temperatura simulada
-float humidity = 50.0;            // Umidade simulada
+float humidity = 48.0;            // Umidade simulada
 
 // Buffers para filtro de média móvel
 uint16_t vrx_buffer[FILTER_SIZE] = {0}; // Buffer para leituras do eixo X do joystick
@@ -65,10 +65,10 @@ uint16_t vry_buffer[FILTER_SIZE] = {0}; // Buffer para leituras do eixo Y do joy
 uint8_t buffer_index = 0;               // Índice atual do buffer para o filtro de média móvel
 
 // Configuração do PWM
-const uint16_t PERIOD = 4096;            // Período do PWM
-const float DIVIDER_PWM = 16.0;          // Divisor de clock do PWM
-uint16_t led_b_level, led_r_level = 100; // Níveis de brilho inicial para os LEDs azul e vermelho
-uint slice_led_b, slice_led_r;           // Slice do PWM para os LEDs azul e vermelho
+const uint16_t PERIOD = 4096;                         // Período do PWM
+const float DIVIDER_PWM = 16.0;                       // Divisor de clock do PWM
+uint16_t led_b_level, led_r_level, led_g_level = 100; // Níveis de brilho inicial para os LEDs azul, vermelho e verde
+uint slice_led_b, slice_led_r, slice_led_g;           // Slice do PWM para os LEDs azul, vermelho e verde
 
 // Função de interrupção para lidar com o pressionamento dos botões
 void gpio_irq_handler(uint gpio, uint32_t events)
@@ -190,19 +190,19 @@ void mudarValor(float temperature, float humidity, npLED_t leds[], int rgb_matri
 {
     uint32_t *temp_symbol, *hum_symbol;
 
-    if (temperature < 16)
+    if (temperature < 10)
     {
         temp_symbol = temperatura[0];
     }
-    else if (temperature <= 22)
+    else if (temperature <= 20)
     {
         temp_symbol = temperatura[1];
     }
-    else if (temperature <= 28)
+    else if (temperature <= 30)
     {
         temp_symbol = temperatura[2];
     }
-    else if (temperature <= 34)
+    else if (temperature <= 40)
     {
         temp_symbol = temperatura[3];
     }
@@ -211,19 +211,19 @@ void mudarValor(float temperature, float humidity, npLED_t leds[], int rgb_matri
         temp_symbol = temperatura[4];
     }
 
-    if (humidity < 32)
+    if (humidity < 26)
     {
         hum_symbol = umidade[0];
     }
-    else if (humidity <= 44)
+    else if (humidity <= 42)
     {
         hum_symbol = umidade[1];
     }
-    else if (humidity <= 56)
+    else if (humidity <= 58)
     {
         hum_symbol = umidade[2];
     }
-    else if (humidity <= 68)
+    else if (humidity <= 74)
     {
         hum_symbol = umidade[3];
     }
@@ -287,6 +287,7 @@ int main()
     setup_joystick();
     setup_pwm(LED_BLUE, &slice_led_b, led_b_level);
     setup_pwm(LED_RED, &slice_led_r, led_r_level);
+    setup_pwm(LED_GREEN, &slice_led_g, led_g_level);
     // Inicializa a matriz de LEDs
     npLED_t leds[LED_COUNT];
     int rgb_matrix[MATRIX_ROWS][MATRIX_COLS][MATRIX_DEPTH];
@@ -309,18 +310,40 @@ int main()
 
         // Aquecedor (LED Vermelho)
         if (temperature < 20)
+        {
             pwm_set_gpio_level(LED_RED, PERIOD);
-        else
-            pwm_set_gpio_level(LED_RED, 0);
-
-        // Umidificador (LED Azul)
-        if (humidity < 40)
-            pwm_set_gpio_level(LED_BLUE, PERIOD);
-        else
             pwm_set_gpio_level(LED_BLUE, 0);
+        }
+        // Ar Condicionado (LED Azul)
+        else if (temperature > 30)
+        {
+            pwm_set_gpio_level(LED_BLUE, PERIOD);
+            pwm_set_gpio_level(LED_RED, 0);
+        }
+        else
+        {
+            pwm_set_gpio_level(LED_BLUE, 0);
+            pwm_set_gpio_level(LED_RED, 0);
+        }
+        // Umidificador (Ciano: LED Verde + LED Azul)
+        if (humidity < 40)
+        {
+            pwm_set_gpio_level(LED_GREEN, PERIOD);
+            pwm_set_gpio_level(LED_BLUE, PERIOD);
+        }
+        //Desumidificador (Amarelo: LED Verde + LED Vermelho)
+        else if (humidity > 60)
+        {
+            pwm_set_gpio_level(LED_GREEN, PERIOD);
+            pwm_set_gpio_level(LED_RED, PERIOD);
+        }
+        else
+        {
+            pwm_set_gpio_level(LED_GREEN, 0);
+        }
 
         // Buzzer (alerta)
-        if (temperature > 35 || humidity > 70)
+        if (temperature > 40 || humidity > 74)
             buzzer_active(900, 100);
         else
             buzzer_active(900, 0);
@@ -337,10 +360,10 @@ int main()
             turnOffLEDs(leds);
             // Exibe dados
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Temp: %.1fC", temperature);
+            snprintf(buffer, sizeof(buffer), "Temperatura %.0fC", temperature);
             ssd1306_draw_string(&ssd, buffer, 0, 0);
 
-            snprintf(buffer, sizeof(buffer), "Umidade: %.1f%%", humidity);
+            snprintf(buffer, sizeof(buffer), "Umidade %.0f RH", humidity);
             ssd1306_draw_string(&ssd, buffer, 0, 10);
         }
         ssd1306_send_data(&ssd);
